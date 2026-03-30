@@ -168,7 +168,6 @@ func StringDecode(obj any, s string) (err error) {
 	default:
 
 		switch ref.Elem().Kind() {
-
 		case reflect.Struct, reflect.Map, reflect.Array, reflect.Slice:
 			err = json.Unmarshal([]byte(s), obj)
 
