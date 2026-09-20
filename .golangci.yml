@@ -1,7 +1,7 @@
 version: "2"
 
 run:
-  go: "1.25"
+  go: "1.26"
   timeout: 5m
   tests: false
   issues-exit-code: 1
@@ -12,7 +12,7 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   new: false
-  fix: false
+  fix: true
 
 output:
   formats:
