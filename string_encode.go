@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -46,11 +47,44 @@ func stringEncode(obj any, maxBytes int) (string, error) {
 	case []byte:
 		return bytesToString(v, maxBytes)
 
-	case int, int8, int16, int32, int64,
-		uint, uint8, uint16, uint32, uint64,
-		float32, float64,
-		bool:
-		return limitString(fmt.Sprintf("%v", v), maxBytes)
+	case int:
+		return limitString(strconv.Itoa(v), maxBytes)
+
+	case int8:
+		return limitString(strconv.FormatInt(int64(v), 10), maxBytes)
+
+	case int16:
+		return limitString(strconv.FormatInt(int64(v), 10), maxBytes)
+
+	case int32:
+		return limitString(strconv.FormatInt(int64(v), 10), maxBytes)
+
+	case int64:
+		return limitString(strconv.FormatInt(v, 10), maxBytes)
+
+	case uint:
+		return limitString(strconv.FormatUint(uint64(v), 10), maxBytes)
+
+	case uint8:
+		return limitString(strconv.FormatUint(uint64(v), 10), maxBytes)
+
+	case uint16:
+		return limitString(strconv.FormatUint(uint64(v), 10), maxBytes)
+
+	case uint32:
+		return limitString(strconv.FormatUint(uint64(v), 10), maxBytes)
+
+	case uint64:
+		return limitString(strconv.FormatUint(v, 10), maxBytes)
+
+	case float32:
+		return limitString(strconv.FormatFloat(float64(v), 'g', -1, 32), maxBytes)
+
+	case float64:
+		return limitString(strconv.FormatFloat(v, 'g', -1, 64), maxBytes)
+
+	case bool:
+		return limitString(strconv.FormatBool(v), maxBytes)
 
 	case time.Duration:
 		return limitString(v.String(), maxBytes)

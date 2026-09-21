@@ -1,0 +1,4 @@
+interface:
+  display_name: "go-cast Usage"
+  short_description: "Use go-cast conversions safely and idiomatically"
+  default_prompt: "Use $go-cast-usage to choose and apply go-cast conversions with correct limits, errors, and examples."
