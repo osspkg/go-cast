@@ -17,16 +17,34 @@ import (
 	"time"
 )
 
+// StrTo converts a string to T using DefaultMaxBytes as the input limit.
 func StrTo[T any](s string) (T, error) {
+	return StrToLimit[T](s, DefaultMaxBytes)
+}
+
+// StrToLimit converts a string to T using maxBytes as the input limit.
+func StrToLimit[T any](s string, maxBytes int) (T, error) {
 	var v T
+	if err := checkSize(len(s), maxBytes); err != nil {
+		return v, err
+	}
 	if len(s) == 0 {
 		return v, nil
 	}
-	err := StringDecode(&v, s)
+	err := StringDecodeLimit(&v, s, maxBytes)
 	return v, err
 }
 
+// StrToSlice converts a separated string to []T using DefaultMaxBytes as the input limit.
 func StrToSlice[T any](s, sep string) ([]T, error) {
+	return StrToSliceLimit[T](s, sep, DefaultMaxBytes)
+}
+
+// StrToSliceLimit converts a separated string to []T using maxBytes as the input limit.
+func StrToSliceLimit[T any](s, sep string, maxBytes int) ([]T, error) {
+	if err := checkSize(len(s), maxBytes); err != nil {
+		return nil, err
+	}
 	if s == "" {
 		return nil, nil
 	}
@@ -35,7 +53,7 @@ func StrToSlice[T any](s, sep string) ([]T, error) {
 	result := make([]T, 0, count)
 
 	for _, ss := range strings.Split(s, sep) {
-		val, err := StrTo[T](ss)
+		val, err := StrToLimit[T](ss, maxBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -45,18 +63,34 @@ func StrToSlice[T any](s, sep string) ([]T, error) {
 	return result, nil
 }
 
+// StringDecode decodes s into obj using DefaultMaxBytes as the input limit.
 func StringDecode(obj any, s string) (err error) {
-	if len(s) == 0 {
+	return StringDecodeLimit(obj, s, DefaultMaxBytes)
+}
+
+// StringDecodeLimit decodes s into obj using maxBytes as the input limit.
+func StringDecodeLimit(obj any, s string, maxBytes int) (err error) {
+	if err = checkSize(len(s), maxBytes); err != nil {
 		return
 	}
 
 	ref := reflect.ValueOf(obj)
-	if ref.Kind() != reflect.Ptr {
+	if ref.Kind() != reflect.Pointer {
 		return fmt.Errorf("got not a pointer")
 	}
 
 	if ref.IsNil() {
 		return fmt.Errorf("got nil pointer")
+	}
+
+	if len(s) == 0 {
+		switch p := obj.(type) {
+		case *string:
+			*p = s
+		case *[]byte:
+			*p = []byte(s)
+		}
+		return
 	}
 
 	if in, ok := obj.(Initializer); ok {
@@ -145,10 +179,19 @@ func StringDecode(obj any, s string) (err error) {
 		*p, err = time.Parse(time.RFC3339, s)
 
 	case io.Writer:
-		_, err = p.Write([]byte(s))
+		data := []byte(s)
+		var n int
+		n, err = p.Write(data)
+		if err == nil && n != len(data) {
+			err = io.ErrShortWrite
+		}
 
 	case io.StringWriter:
-		_, err = p.WriteString(s)
+		var n int
+		n, err = p.WriteString(s)
+		if err == nil && n != len(s) {
+			err = io.ErrShortWrite
+		}
 
 	case UnStringer:
 		p.UnString(s)

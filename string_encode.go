@@ -15,82 +15,107 @@ import (
 	"time"
 )
 
-func StringEncode(obj any) (s string, err error) {
+// StringEncode converts obj to a string using DefaultMaxBytes as the output limit.
+func StringEncode(obj any) (string, error) {
+	return StringEncodeLimit(obj, DefaultMaxBytes)
+}
+
+// StringEncodeLimit converts obj to a string using maxBytes as the output limit.
+func StringEncodeLimit(obj any, maxBytes int) (s string, err error) {
+	if err = checkSize(0, maxBytes); err != nil {
+		return "", err
+	}
+	return stringEncode(obj, maxBytes)
+}
+
+func stringEncode(obj any, maxBytes int) (s string, err error) {
 	if obj == nil {
 		return
 	}
 
 	ref := reflect.ValueOf(obj)
-	if ref.Kind() == reflect.Ptr && ref.IsNil() {
+	if ref.Kind() == reflect.Pointer && ref.IsNil() {
 		return
 	}
 
 	switch v := obj.(type) {
 
 	case string:
-		s = v
+		return limitString(v, maxBytes)
 
 	case []byte:
-		s = string(v)
+		return bytesToString(v, maxBytes)
 
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
 		float32, float64,
 		bool:
-		s = fmt.Sprintf("%v", v)
+		return limitString(fmt.Sprintf("%v", v), maxBytes)
 
 	case time.Duration:
-		s = v.String()
+		return limitString(v.String(), maxBytes)
 
 	case time.Time:
-		s = v.Format(time.RFC3339)
+		return limitString(v.Format(time.RFC3339), maxBytes)
 
 	case io.Reader:
-		var b []byte
-		b, err = io.ReadAll(v)
-		s = string(b)
+		b, readErr := readAllLimit(v, maxBytes)
+		if readErr != nil {
+			return "", readErr
+		}
+		return bytesToString(b, maxBytes)
 
 	case Byter:
-		s = string(v.Bytes())
+		return bytesToString(v.Bytes(), maxBytes)
 
 	case Stringer:
-		s = v.String()
+		return limitString(v.String(), maxBytes)
 
 	case fmt.GoStringer:
-		s = v.GoString()
+		return limitString(v.GoString(), maxBytes)
 
 	case encoding.BinaryMarshaler:
-		var b []byte
-		b, err = v.MarshalBinary()
-		s = string(b)
+		b, marshalErr := v.MarshalBinary()
+		if marshalErr != nil {
+			return "", marshalErr
+		}
+		return bytesToString(b, maxBytes)
 
 	case encoding.TextMarshaler:
-		var b []byte
-		b, err = v.MarshalText()
-		s = string(b)
+		b, marshalErr := v.MarshalText()
+		if marshalErr != nil {
+			return "", marshalErr
+		}
+		return bytesToString(b, maxBytes)
 
 	case json.Marshaler:
-		var b []byte
-		b, err = v.MarshalJSON()
-		s = string(b)
+		b, marshalErr := v.MarshalJSON()
+		if marshalErr != nil {
+			return "", marshalErr
+		}
+		return bytesToString(b, maxBytes)
 
 	case xml.Marshaler:
-		var b []byte
-		b, err = xml.Marshal(v)
-		s = string(b)
+		b, marshalErr := xml.Marshal(v)
+		if marshalErr != nil {
+			return "", marshalErr
+		}
+		return bytesToString(b, maxBytes)
 
 	case error:
-		s = v.Error()
+		return limitString(v.Error(), maxBytes)
 
 	default:
 		switch ref.Kind() {
-		case reflect.Ptr:
-			return StringEncode(ref.Elem().Interface())
+		case reflect.Pointer:
+			return stringEncode(ref.Elem().Interface(), maxBytes)
 
 		case reflect.Struct, reflect.Map, reflect.Array, reflect.Slice:
-			var b []byte
-			b, err = json.Marshal(obj)
-			s = string(b)
+			b, marshalErr := json.Marshal(obj)
+			if marshalErr != nil {
+				return "", marshalErr
+			}
+			return bytesToString(b, maxBytes)
 
 		default:
 			err = fmt.Errorf("unsupported type: %T", obj)
@@ -98,4 +123,35 @@ func StringEncode(obj any) (s string, err error) {
 	}
 
 	return
+}
+
+func readAllLimit(r io.Reader, maxBytes int) ([]byte, error) {
+	const chunkSize = 32 << 10
+
+	capacity := chunkSize
+	if maxBytes < capacity {
+		capacity = maxBytes
+	}
+	data := make([]byte, 0, capacity)
+	chunk := make([]byte, chunkSize)
+
+	for {
+		n, err := r.Read(chunk)
+		if n < 0 || n > len(chunk) {
+			return nil, fmt.Errorf("cast: reader returned invalid byte count %d", n)
+		}
+		if sizeErr := checkSize(len(data)+n, maxBytes); sizeErr != nil {
+			return nil, sizeErr
+		}
+		data = append(data, chunk[:n]...)
+		if err == io.EOF {
+			return data, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			return nil, io.ErrNoProgress
+		}
+	}
 }
