@@ -5,6 +5,7 @@
 
 package cast
 
+// Ptr returns a pointer to arg.
 func Ptr[T any](arg T) *T {
 	return &arg
 }

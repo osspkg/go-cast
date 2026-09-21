@@ -21,21 +21,21 @@ func StringEncode(obj any) (string, error) {
 }
 
 // StringEncodeLimit converts obj to a string using maxBytes as the output limit.
-func StringEncodeLimit(obj any, maxBytes int) (s string, err error) {
-	if err = checkSize(0, maxBytes); err != nil {
+func StringEncodeLimit(obj any, maxBytes int) (string, error) {
+	if err := checkSize(0, maxBytes); err != nil {
 		return "", err
 	}
 	return stringEncode(obj, maxBytes)
 }
 
-func stringEncode(obj any, maxBytes int) (s string, err error) {
+func stringEncode(obj any, maxBytes int) (string, error) {
 	if obj == nil {
-		return
+		return "", nil
 	}
 
 	ref := reflect.ValueOf(obj)
 	if ref.Kind() == reflect.Pointer && ref.IsNil() {
-		return
+		return "", nil
 	}
 
 	switch v := obj.(type) {
@@ -118,11 +118,9 @@ func stringEncode(obj any, maxBytes int) (s string, err error) {
 			return bytesToString(b, maxBytes)
 
 		default:
-			err = fmt.Errorf("unsupported type: %T", obj)
+			return "", fmt.Errorf("unsupported type: %T", obj)
 		}
 	}
-
-	return
 }
 
 func readAllLimit(r io.Reader, maxBytes int) ([]byte, error) {

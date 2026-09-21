@@ -23,6 +23,7 @@ func StrTo[T any](s string) (T, error) {
 }
 
 // StrToLimit converts a string to T using maxBytes as the input limit.
+// For an empty string, it returns T's zero value without invoking Initializer.
 func StrToLimit[T any](s string, maxBytes int) (T, error) {
 	var v T
 	if err := checkSize(len(s), maxBytes); err != nil {
@@ -64,14 +65,16 @@ func StrToSliceLimit[T any](s, sep string, maxBytes int) ([]T, error) {
 }
 
 // StringDecode decodes s into obj using DefaultMaxBytes as the input limit.
-func StringDecode(obj any, s string) (err error) {
+func StringDecode(obj any, s string) error {
 	return StringDecodeLimit(obj, s, DefaultMaxBytes)
 }
 
 // StringDecodeLimit decodes s into obj using maxBytes as the input limit.
-func StringDecodeLimit(obj any, s string, maxBytes int) (err error) {
-	if err = checkSize(len(s), maxBytes); err != nil {
-		return
+// An empty input clears string and byte-slice destinations; other destinations
+// remain unchanged and are not initialized.
+func StringDecodeLimit(obj any, s string, maxBytes int) error {
+	if err := checkSize(len(s), maxBytes); err != nil {
+		return err
 	}
 
 	ref := reflect.ValueOf(obj)
@@ -90,15 +93,16 @@ func StringDecodeLimit(obj any, s string, maxBytes int) (err error) {
 		case *[]byte:
 			*p = []byte(s)
 		}
-		return
+		return nil
 	}
 
 	if in, ok := obj.(Initializer); ok {
-		if err = in.Initialize(); err != nil {
-			return
+		if err := in.Initialize(); err != nil {
+			return err
 		}
 	}
 
+	var err error
 	switch p := obj.(type) {
 
 	case *string:
@@ -219,5 +223,5 @@ func StringDecodeLimit(obj any, s string, maxBytes int) (err error) {
 		}
 	}
 
-	return
+	return err
 }
