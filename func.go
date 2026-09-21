@@ -5,14 +5,18 @@
 
 package cast
 
+// WriteFunc adapts a function to the io.Writer interface.
 type WriteFunc func([]byte) (int, error)
 
+// Write implements io.Writer.
 func (w WriteFunc) Write(p []byte) (int, error) {
 	return w(p)
 }
 
+// ReadFunc adapts a function to the io.Reader interface.
 type ReadFunc func([]byte) (int, error)
 
+// Read implements io.Reader.
 func (r ReadFunc) Read(p []byte) (int, error) {
 	return r(p)
 }

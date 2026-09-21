@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -78,6 +79,12 @@ type errorReader struct {
 
 func (r *errorReader) Read(p []byte) (n int, err error) {
 	return 0, r.err
+}
+
+type noProgressReader struct{}
+
+func (noProgressReader) Read([]byte) (int, error) {
+	return 0, nil
 }
 
 type errorBinaryMarshaler struct {
@@ -393,6 +400,25 @@ func TestUnit_StringEncode(t *testing.T) {
 		}
 		if result != expected {
 			t.Errorf("result mismatch\nexpected: %q\nactual:   %q", expected, result)
+		}
+	})
+
+	t.Run("output limit", func(t *testing.T) {
+		_, err := cast.StringEncodeLimit("value", 4)
+		if !errors.Is(err, cast.ErrSizeLimit) {
+			t.Fatalf("error = %v, want cast.ErrSizeLimit", err)
+		}
+
+		_, err = cast.StringEncodeLimit(bytes.NewBufferString("value"), 4)
+		if !errors.Is(err, cast.ErrSizeLimit) {
+			t.Fatalf("reader error = %v, want cast.ErrSizeLimit", err)
+		}
+	})
+
+	t.Run("reader without progress", func(t *testing.T) {
+		_, err := cast.StringEncodeLimit(noProgressReader{}, 4)
+		if !errors.Is(err, io.ErrNoProgress) {
+			t.Fatalf("error = %v, want io.ErrNoProgress", err)
 		}
 	})
 }

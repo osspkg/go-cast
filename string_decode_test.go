@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -74,12 +75,24 @@ func (w *testWriter) Write(p []byte) (n int, err error) {
 	return w.Buffer.Write(p)
 }
 
+type shortWriter struct{}
+
+func (shortWriter) Write(p []byte) (int, error) {
+	return len(p) - 1, nil
+}
+
 type testStringWriter struct {
 	Buffer *bytes.Buffer
 }
 
 func (w *testStringWriter) WriteString(s string) (n int, err error) {
 	return w.Buffer.WriteString(s)
+}
+
+type shortStringWriter struct{}
+
+func (shortStringWriter) WriteString(s string) (int, error) {
+	return len(s) - 1, nil
 }
 
 type testComplexStruct struct {
@@ -401,6 +414,43 @@ func TestStringDecode(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("empty string clears destination", func(t *testing.T) {
+		value := "stale"
+		if err := cast.StringDecode(&value, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if value != "" {
+			t.Fatalf("value = %q, want empty string", value)
+		}
+	})
+
+	t.Run("short writer", func(t *testing.T) {
+		err := cast.StringDecode(&shortWriter{}, "value")
+		if !errors.Is(err, io.ErrShortWrite) {
+			t.Fatalf("error = %v, want io.ErrShortWrite", err)
+		}
+	})
+
+	t.Run("short string writer", func(t *testing.T) {
+		err := cast.StringDecode(&shortStringWriter{}, "value")
+		if !errors.Is(err, io.ErrShortWrite) {
+			t.Fatalf("error = %v, want io.ErrShortWrite", err)
+		}
+	})
+
+	t.Run("input limit", func(t *testing.T) {
+		var value string
+		err := cast.StringDecodeLimit(&value, "value", 4)
+		if !errors.Is(err, cast.ErrSizeLimit) {
+			t.Fatalf("error = %v, want cast.ErrSizeLimit", err)
+		}
+
+		_, err = cast.StrToSliceLimit[string]("a,b,c", ",", 3)
+		if !errors.Is(err, cast.ErrSizeLimit) {
+			t.Fatalf("slice error = %v, want cast.ErrSizeLimit", err)
+		}
+	})
 
 	// Тест для проверки обработки ошибок в интерфейсах
 	t.Run("error in interface", func(t *testing.T) {

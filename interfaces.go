@@ -5,18 +5,22 @@
 
 package cast
 
+// Initializer initializes a value before it is decoded.
 type Initializer interface {
 	Initialize() error
 }
 
+// Byter returns the byte representation of a value.
 type Byter interface {
 	Bytes() []byte
 }
 
+// Stringer returns the string representation of a value.
 type Stringer interface {
 	String() string
 }
 
+// UnStringer updates a value from its string representation.
 type UnStringer interface {
 	UnString(string)
 }
